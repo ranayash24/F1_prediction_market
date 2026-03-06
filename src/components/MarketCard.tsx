@@ -20,13 +20,13 @@ export default function MarketCard({ market, index }: { market: Market; index: n
   const totalShares = market.yesShares + market.noShares;
   const cardStyle = { "--market-index": index } as CSSProperties;
 
-  const handleBuy = (side: "yes" | "no") => {
+  const handleBuy = async (side: "yes" | "no") => {
     if (!state.user) {
       setMessage("Sign in to trade.");
       return;
     }
 
-    const success = buyShares(market.id, side, shares);
+    const success = await buyShares(market.id, side, shares);
     if (!success) {
       setMessage("Not enough GP Coins for this trade.");
       return;
@@ -94,10 +94,10 @@ export default function MarketCard({ market, index }: { market: Market; index: n
           />
         </label>
         <div className="market__buttons">
-          <button className="btn btn--yes" type="button" onClick={() => handleBuy("yes")}>
+          <button className="btn btn--yes" type="button" onClick={() => void handleBuy("yes")}>
             Buy YES
           </button>
-          <button className="btn btn--no" type="button" onClick={() => handleBuy("no")}>
+          <button className="btn btn--no" type="button" onClick={() => void handleBuy("no")}>
             Buy NO
           </button>
         </div>

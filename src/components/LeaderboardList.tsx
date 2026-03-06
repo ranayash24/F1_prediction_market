@@ -9,6 +9,7 @@ import { formatCoins } from "@/lib/utils";
 type LeaderboardEntry = {
   name: string;
   balance: number;
+  email?: string;
 };
 
 export default function LeaderboardList() {
