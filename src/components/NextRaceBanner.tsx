@@ -1,7 +1,10 @@
 import { calendar2026 } from "@/lib/calendar-2026";
 
 export default function NextRaceBanner() {
-  const nextRace = calendar2026[0];
+  const today = new Date().toISOString().slice(0, 10);
+  const nextRace =
+    calendar2026.find((race) => race.date >= today) ??
+    calendar2026[calendar2026.length - 1];
 
   return (
     <div className="card">

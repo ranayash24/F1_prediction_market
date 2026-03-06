@@ -67,12 +67,12 @@ export default function TopNav() {
   }, [pathname]);
 
   const leaderboardEntries = useMemo<LeaderboardEntry[]>(() => {
-    if (isFirebaseConfigured() && remoteEntries.length > 0) return remoteEntries;
-    return Object.values(state.users).map((user) => ({
-      name: user.name,
-      balance: user.balance,
-      email: user.email,
-    }));
+    if (isFirebaseConfigured()) {
+      return [...remoteEntries].sort((a, b) => b.balance - a.balance);
+    }
+    return Object.values(state.users)
+      .map((user) => ({ name: user.name, balance: user.balance, email: user.email }))
+      .sort((a, b) => b.balance - a.balance);
   }, [state.users, remoteEntries]);
 
   const rank = useMemo(() => {

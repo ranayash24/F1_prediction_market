@@ -12,6 +12,8 @@ export type Market = {
 export type Position = {
   yes: number;
   no: number;
+  yesCost: number;
+  noCost: number;
 };
 
 export type User = {

@@ -6,12 +6,12 @@ export default function LeaderboardPage() {
       <div className="container">
         <section className="section">
           <div className="section__title">
-            <h2>Leaderboard</h2>
-            <p className="muted">Top traders sorted by GP Coin balance.</p>
+            <div>
+              <h2>Leaderboard</h2>
+              <p className="muted">Top GP Coin traders this season.</p>
+            </div>
           </div>
-          <div className="card">
-            <LeaderboardList />
-          </div>
+          <LeaderboardList />
         </section>
       </div>
     </main>
