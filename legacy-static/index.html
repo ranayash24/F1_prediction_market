@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redline Markets - F1 Prediction Market</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="hero">
+      <div class="hero__inner">
+        <div>
+          <p class="eyebrow">F1 PLAY MONEY PREDICTION MARKET</p>
+          <h1>Redline Markets</h1>
+          <p class="hero__copy">
+            Put your grid-read to the test. Buy YES/NO shares on race outcomes,
+            track your balance, and climb the paddock leaderboard.
+          </p>
+          <div class="hero__meta">
+            <div>
+              <span class="meta__label">Status</span>
+              <span class="meta__value">Live preseason test</span>
+            </div>
+            <div>
+              <span class="meta__label">Wallet</span>
+              <span class="meta__value" id="walletBalance">$0</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero__panel">
+          <h2>Sign in to the paddock</h2>
+          <p class="muted">Create a profile to claim 10,000 play credits.</p>
+          <form id="authForm">
+            <label>
+              Display name
+              <input type="text" id="displayName" placeholder="CharlesFan23" required />
+            </label>
+            <label>
+              Email
+              <input type="email" id="email" placeholder="you@f1grid.com" required />
+            </label>
+            <label>
+              Password
+              <input type="password" id="password" placeholder="••••••••" required />
+            </label>
+            <button type="submit" class="btn btn--primary">Enter paddock</button>
+          </form>
+          <div class="auth__actions">
+            <button id="signInBtn" class="btn btn--ghost" type="button">Sign in</button>
+            <button id="signOutBtn" class="btn btn--ghost" type="button" hidden>Sign out</button>
+          </div>
+          <p class="muted" id="authStatus">Not signed in.</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="markets">
+        <div class="section__title">
+          <h2>Upcoming markets</h2>
+          <p class="muted">Quali, race winner, and safety car outcomes for the next three rounds.</p>
+        </div>
+        <div id="marketsGrid" class="markets__grid"></div>
+      </section>
+
+      <section class="portfolio">
+        <div class="section__title">
+          <h2>Your garage</h2>
+          <p class="muted">Track open positions and wallet health.</p>
+        </div>
+        <div class="portfolio__grid">
+          <div class="card card--dark">
+            <h3>Wallet overview</h3>
+            <div class="wallet__stats">
+              <div>
+                <span class="meta__label">Balance</span>
+                <span class="meta__value" id="balanceValue">$0</span>
+              </div>
+              <div>
+                <span class="meta__label">Open positions</span>
+                <span class="meta__value" id="positionCount">0</span>
+              </div>
+            </div>
+            <p class="muted" id="walletHint">Sign in to start trading.</p>
+          </div>
+          <div class="card card--dark" id="positionsCard">
+            <h3>Open positions</h3>
+            <div id="positionsList" class="positions"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="leaderboard">
+        <div class="section__title">
+          <h2>Leaderboard</h2>
+          <p class="muted">Top paddock traders by balance.</p>
+        </div>
+        <div class="card">
+          <div id="leaderboardList" class="leaderboard__list"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Play money only. Redline Markets is a demo experience.</p>
+    </footer>
+
+    <template id="marketCardTemplate">
+      <article class="card market">
+        <div class="market__header">
+          <div>
+            <p class="market__round"></p>
+            <h3 class="market__name"></h3>
+          </div>
+          <span class="pill"></span>
+        </div>
+        <p class="muted market__desc"></p>
+        <div class="market__odds">
+          <div>
+            <span class="meta__label">YES price</span>
+            <span class="meta__value market__yes"></span>
+          </div>
+          <div>
+            <span class="meta__label">NO price</span>
+            <span class="meta__value market__no"></span>
+          </div>
+        </div>
+        <div class="market__bar" role="img" aria-label="YES/NO probability split">
+          <div class="bar bar--yes"><span class="bar__value"></span></div>
+          <div class="bar bar--no"><span class="bar__value"></span></div>
+        </div>
+        <div class="market__bar-labels">
+          <span class="label label--yes">YES</span>
+          <span class="label label--no">NO</span>
+        </div>
+        <div class="market__actions">
+          <label>
+            Shares
+            <input type="number" min="1" value="5" class="market__shares" />
+          </label>
+          <div class="market__buttons">
+            <button class="btn btn--yes" data-side="yes">Buy YES</button>
+            <button class="btn btn--no" data-side="no">Buy NO</button>
+          </div>
+        </div>
+        <p class="muted market__liquidity"></p>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

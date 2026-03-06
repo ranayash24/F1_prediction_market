@@ -1,0 +1,37 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:redline;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DATABASE_USER:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  h2:
+    console:
+      enabled: true
+      path: /h2
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${FIREBASE_ISSUER_URI:}
+
+app:
+  security:
+    enabled: ${SECURITY_ENABLED:false}
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+  firebase:
+    issuer-uri: ${FIREBASE_ISSUER_URI:}
+
+logging:
+  level:
+    org.springframework.security: INFO
