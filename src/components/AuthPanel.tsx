@@ -37,6 +37,12 @@ export default function AuthPanel() {
         password.trim()
       );
       await updateProfile(credential.user, { displayName: name.trim() });
+      await credential.user.reload();
+      signIn({
+        name: credential.user.displayName || name.trim(),
+        email: credential.user.email || email.trim().toLowerCase(),
+        provider: credential.user.providerData[0]?.providerId || "email",
+      });
       setMessage("Account created. You're in.");
     } catch (error) {
       try {
@@ -48,6 +54,12 @@ export default function AuthPanel() {
         if (!credential.user.displayName && name.trim()) {
           await updateProfile(credential.user, { displayName: name.trim() });
         }
+        await credential.user.reload();
+        signIn({
+          name: credential.user.displayName || name.trim() || "GP Racer",
+          email: credential.user.email || email.trim().toLowerCase(),
+          provider: credential.user.providerData[0]?.providerId || "email",
+        });
         setMessage("Signed in.");
       } catch (signInError) {
         setMessage("Email auth failed. Check credentials.");
