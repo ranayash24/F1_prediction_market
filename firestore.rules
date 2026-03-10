@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Markets: anyone can read, authenticated users can update share counts
+    match /markets/{marketId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Users: only the authenticated owner can read or write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Trade history: owner can read and create, nobody can edit or delete
+      match /trades/{tradeId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update, delete: if false;
+      }
+    }
+
+    // Leaderboard: anyone can read, authenticated users can write only their own entry
+    match /leaderboard/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Chat: real-time messages per market
+    match /chats/{marketId}/messages/{messageId} {
+      // Anyone can read messages
+      allow read: if true;
+
+      // Authenticated users can post — userId must match their auth uid
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 300;
+
+      // Only the original author can edit their own message (cannot change userId or userName)
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.userName == resource.data.userName
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 300;
+
+      // Only the original author can delete their own message
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+  }
+}

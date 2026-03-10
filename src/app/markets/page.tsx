@@ -1,5 +1,4 @@
 import MarketsGrid from "@/components/MarketsGrid";
-import TelemetryPanel from "@/components/TelemetryPanel";
 
 export default function MarketsPage() {
   return (
@@ -7,17 +6,10 @@ export default function MarketsPage() {
       <div className="container">
         <section className="section">
           <div className="section__title">
-            <h2>Upcoming markets</h2>
-            <p className="muted">Quali winners, race winners, and safety car calls.</p>
+            <h2>Markets</h2>
+            <p className="muted">Select a round, then trade YES or NO on each outcome.</p>
           </div>
           <MarketsGrid />
-        </section>
-        <section className="section">
-          <div className="section__title">
-            <h2>Race control</h2>
-            <p className="muted">Live telemetry stream powering market sentiment.</p>
-          </div>
-          <TelemetryPanel />
         </section>
       </div>
     </main>

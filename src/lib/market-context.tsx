@@ -41,6 +41,7 @@ type MarketContextValue = {
   signIn: (payload: AuthPayload) => void;
   signOut: () => void;
   buyShares: (marketId: string, side: "yes" | "no", shares: number) => Promise<boolean>;
+  sellShares: (marketId: string, side: "yes" | "no", shares: number) => Promise<boolean>;
   purchaseCoins: (amount: number) => void;
   getMarketPrice: (market: Market) => { yes: number; no: number };
 };
@@ -284,6 +285,20 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
           currentEmail: hydrated.email,
           users: { ...prev.users, [hydrated.email]: hydrated },
         }));
+
+        // Write leaderboard entry here — uid is guaranteed from the outer closure
+        setDoc(
+          doc(db, "leaderboard", user.uid),
+          {
+            name: hydrated.name,
+            email: hydrated.email,
+            balance: hydrated.balance,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {
+          return;
+        });
       });
     });
     return () => {
@@ -336,10 +351,12 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
           });
 
           const positions: Record<string, Position> = { ...(user.positions || {}) };
-          const existingPosition = positions[marketId] || { yes: 0, no: 0 };
+          const existingPosition = positions[marketId] || { yes: 0, no: 0, yesCost: 0, noCost: 0 };
+          const costKey = side === "yes" ? "yesCost" : "noCost";
           positions[marketId] = {
             ...existingPosition,
             [side]: existingPosition[side] + shares,
+            [costKey]: (existingPosition[costKey] ?? 0) + cost,
           };
 
           transaction.set(
@@ -354,6 +371,20 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
             },
             { merge: true }
           );
+
+          const tradeRef = doc(collection(db, "users", uid, "trades"));
+          transaction.set(tradeRef, {
+            marketId,
+            marketName: normalizedMarket.name,
+            marketRound: normalizedMarket.round,
+            category: normalizedMarket.category,
+            side,
+            shares,
+            price,
+            total: cost,
+            type: "buy",
+            createdAt: serverTimestamp(),
+          });
 
           success = true;
         });
@@ -389,10 +420,12 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       updatedMarkets[marketIndex] = updatedMarket;
 
       const positions: Record<string, Position> = { ...currentUser.positions };
-      const existingPosition = positions[marketId] || { yes: 0, no: 0 };
+      const existingPosition = positions[marketId] || { yes: 0, no: 0, yesCost: 0, noCost: 0 };
+      const costKey = side === "yes" ? "yesCost" : "noCost";
       positions[marketId] = {
         ...existingPosition,
         [side]: existingPosition[side] + shares,
+        [costKey]: (existingPosition[costKey] ?? 0) + cost,
       };
 
       success = true;
@@ -447,30 +480,150 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const sellShares = async (marketId: string, side: "yes" | "no", shares: number) => {
+    if (!Number.isFinite(shares) || shares <= 0) return false;
+
+    if (isFirebaseConfigured()) {
+      const auth = getFirebaseAuth();
+      const uid = auth.currentUser?.uid;
+      if (!uid) return false;
+      const db = getFirestoreDb();
+      let success = false;
+      try {
+        await runTransaction(db, async (transaction) => {
+          const marketRef = doc(db, "markets", marketId);
+          const userRef = doc(db, "users", uid);
+          const marketSnap = await transaction.get(marketRef);
+          const userSnap = await transaction.get(userRef);
+          if (!marketSnap.exists() || !userSnap.exists()) return;
+          const market = marketSnap.data() as Market;
+          const user = userSnap.data() as User;
+
+          const positions: Record<string, Position> = { ...(user.positions || {}) };
+          const position = positions[marketId] || { yes: 0, no: 0, yesCost: 0, noCost: 0 };
+          if (position[side] < shares) return;
+
+          const normalizedMarket: Market = {
+            id: marketId,
+            round: market.round || "",
+            name: market.name || "",
+            description: market.description || "",
+            category: market.category || "",
+            yesShares: Number.isFinite(market.yesShares) ? market.yesShares : 0,
+            noShares: Number.isFinite(market.noShares) ? market.noShares : 0,
+            volume: Number.isFinite(market.volume) ? market.volume : 0,
+          };
+          const prices = getMarketPrice(normalizedMarket);
+          const price = side === "yes" ? prices.yes : prices.no;
+          const proceeds = Math.round(price * 100) * shares;
+          const balance = Number.isFinite(user.balance) ? user.balance : 0;
+
+          transaction.update(marketRef, {
+            yesShares: Math.max(0, normalizedMarket.yesShares - (side === "yes" ? shares : 0)),
+            noShares: Math.max(0, normalizedMarket.noShares - (side === "no" ? shares : 0)),
+          });
+
+          const costKey = side === "yes" ? "yesCost" : "noCost";
+          const existingCost = position[costKey] ?? 0;
+          const costReduction = position[side] > 0 ? (existingCost / position[side]) * shares : 0;
+          const newPosition = {
+            ...position,
+            [side]: position[side] - shares,
+            [costKey]: Math.max(0, existingCost - costReduction),
+          };
+          if (newPosition.yes === 0 && newPosition.no === 0) {
+            delete positions[marketId];
+          } else {
+            positions[marketId] = newPosition;
+          }
+
+          transaction.set(
+            userRef,
+            {
+              balance: balance + proceeds,
+              positions,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+
+          const tradeRef = doc(collection(db, "users", uid, "trades"));
+          transaction.set(tradeRef, {
+            marketId,
+            marketName: normalizedMarket.name,
+            marketRound: normalizedMarket.round,
+            category: normalizedMarket.category,
+            side,
+            shares,
+            price,
+            total: proceeds,
+            type: "sell",
+            createdAt: serverTimestamp(),
+          });
+
+          success = true;
+        });
+      } catch {
+        return false;
+      }
+      return success;
+    }
+
+    let success = false;
+    setState((prev) => {
+      if (!prev.currentEmail) return prev;
+      const currentUser = prev.users[prev.currentEmail];
+      if (!currentUser) return prev;
+      const marketIndex = prev.markets.findIndex((m) => m.id === marketId);
+      if (marketIndex === -1) return prev;
+
+      const market = prev.markets[marketIndex];
+      const position = currentUser.positions[marketId] || { yes: 0, no: 0, yesCost: 0, noCost: 0 };
+      if (position[side] < shares) return prev;
+
+      const prices = getMarketPrice(market);
+      const price = side === "yes" ? prices.yes : prices.no;
+      const proceeds = Math.round(price * 100) * shares;
+
+      const updatedMarket = { ...market };
+      if (side === "yes") updatedMarket.yesShares = Math.max(0, updatedMarket.yesShares - shares);
+      else updatedMarket.noShares = Math.max(0, updatedMarket.noShares - shares);
+
+      const updatedMarkets = [...prev.markets];
+      updatedMarkets[marketIndex] = updatedMarket;
+
+      const costKey = side === "yes" ? "yesCost" : "noCost";
+      const existingCost = position[costKey] ?? 0;
+      const costReduction = position[side] > 0 ? (existingCost / position[side]) * shares : 0;
+      const positions = { ...currentUser.positions };
+      const newPosition = {
+        ...position,
+        [side]: position[side] - shares,
+        [costKey]: Math.max(0, existingCost - costReduction),
+      };
+      if (newPosition.yes === 0 && newPosition.no === 0) {
+        delete positions[marketId];
+      } else {
+        positions[marketId] = newPosition;
+      }
+
+      success = true;
+      return {
+        ...prev,
+        markets: updatedMarkets,
+        users: {
+          ...prev.users,
+          [currentUser.email]: { ...currentUser, balance: currentUser.balance + proceeds, positions },
+        },
+      };
+    });
+    return success;
+  };
+
   const value = useMemo(() => {
     const user = state.currentEmail ? state.users[state.currentEmail] || null : null;
-    return { state: { ...state, user }, signIn, signOut, buyShares, purchaseCoins, getMarketPrice };
+    return { state: { ...state, user }, signIn, signOut, buyShares, sellShares, purchaseCoins, getMarketPrice };
   }, [state]);
-
-  useEffect(() => {
-    if (!isFirebaseConfigured() || !state.user) return;
-    const auth = getFirebaseAuth();
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    const db = getFirestoreDb();
-    setDoc(
-      doc(db, "leaderboard", uid),
-      {
-        name: state.user.name,
-        email: state.user.email,
-        balance: state.user.balance,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    ).catch(() => {
-      return;
-    });
-  }, [state.user?.name, state.user?.email, state.user?.balance]);
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
 }
