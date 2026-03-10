@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMarket } from "@/lib/market-context";
+import { ADMIN_EMAIL } from "@/lib/data";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { getFirestoreDb, isFirebaseConfigured } from "@/lib/firebase";
 
@@ -13,6 +14,7 @@ const links = [
   { href: "/my-bets", label: "My Bets" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/wallet", label: "Wallet" },
+  { href: "/docs", label: "Docs" },
 ];
 
 type LeaderboardEntry = {
@@ -117,6 +119,14 @@ export default function TopNav() {
               </Link>
             );
           })}
+          {state.user?.email === ADMIN_EMAIL && (
+            <Link
+              href="/admin"
+              className={pathname === "/admin" ? "nav__link nav__link--active nav__link--admin" : "nav__link nav__link--admin"}
+            >
+              Admin
+            </Link>
+          )}
         </nav>
         <div className="nav__actions">
           <div className="wallet-pill">

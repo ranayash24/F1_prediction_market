@@ -9,6 +9,18 @@ export type Market = {
   volume: number;
 };
 
+export type PendingMarket = {
+  id: string;
+  round: string;
+  name: string;
+  description: string;
+  category: string;
+  submittedBy: string;
+  submittedByName: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt?: unknown;
+};
+
 export type Position = {
   yes: number;
   no: number;

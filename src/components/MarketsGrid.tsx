@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMarket } from "@/lib/market-context";
 import MarketCard from "@/components/MarketCard";
+import CreateMarketForm from "@/components/CreateMarketForm";
 import { calendar2026 } from "@/lib/calendar-2026";
 
 export default function MarketsGrid() {
@@ -16,6 +17,7 @@ export default function MarketsGrid() {
   }, []);
 
   const [selectedRound, setSelectedRound] = useState(defaultRound);
+  const [showCreate, setShowCreate] = useState(false);
 
   const roundMarkets = useMemo(() => {
     return state.markets.filter((m) => {
@@ -29,8 +31,16 @@ export default function MarketsGrid() {
 
   return (
     <div>
-      {/* Round selector */}
-      <div className="round-tabs" role="tablist" aria-label="Race rounds">
+      {showCreate && (
+        <CreateMarketForm
+          defaultRound={selectedRound}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {/* Round selector + create button */}
+      <div className="markets-toolbar">
+        <div className="round-tabs" role="tablist" aria-label="Race rounds">
         {calendar2026.map((race) => {
           const isPast = race.date < today;
           const isActive = selectedRound === race.round;
@@ -53,6 +63,15 @@ export default function MarketsGrid() {
             </button>
           );
         })}
+        </div>
+        {state.user && (
+          <button
+            className="btn btn--primary create-market-trigger"
+            onClick={() => setShowCreate(true)}
+          >
+            + Create Market
+          </button>
+        )}
       </div>
 
       {/* Selected race name */}

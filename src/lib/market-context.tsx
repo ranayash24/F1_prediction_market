@@ -13,8 +13,8 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import { INITIAL_COINS, buildMarketsFromCalendar } from "@/lib/data";
-import type { Market, Position, User } from "@/lib/types";
+import { ADMIN_EMAIL, INITIAL_COINS, buildMarketsFromCalendar } from "@/lib/data";
+import type { Market, PendingMarket, Position, User } from "@/lib/types";
 import { getFirebaseAuth, getFirestoreDb, isFirebaseConfigured } from "@/lib/firebase";
 
 const STORAGE_KEY = "gp-market-state-v1";
@@ -24,6 +24,7 @@ type MarketState = {
   markets: Market[];
   users: Record<string, User>;
   currentEmail: string | null;
+  pendingMarkets: PendingMarket[];
 };
 
 type MarketContextState = MarketState & {
@@ -36,6 +37,13 @@ type AuthPayload = {
   provider: string;
 };
 
+type CreateMarketData = {
+  round: string;
+  name: string;
+  description: string;
+  category: string;
+};
+
 type MarketContextValue = {
   state: MarketContextState;
   signIn: (payload: AuthPayload) => void;
@@ -44,6 +52,9 @@ type MarketContextValue = {
   sellShares: (marketId: string, side: "yes" | "no", shares: number) => Promise<boolean>;
   purchaseCoins: (amount: number) => void;
   getMarketPrice: (market: Market) => { yes: number; no: number };
+  createMarket: (data: CreateMarketData) => Promise<{ success: boolean; error?: string }>;
+  approveMarket: (pendingId: string) => Promise<boolean>;
+  rejectMarket: (pendingId: string) => Promise<boolean>;
 };
 
 const MarketContext = createContext<MarketContextValue | null>(null);
@@ -60,6 +71,7 @@ const defaultState: MarketState = {
   markets: seedMarkets,
   users: {},
   currentEmail: null,
+  pendingMarkets: [],
 };
 
 function parseState(raw: string | null): MarketState | null {
@@ -71,6 +83,7 @@ function parseState(raw: string | null): MarketState | null {
       markets: parsed.markets,
       users: parsed.users || {},
       currentEmail: parsed.currentEmail || null,
+      pendingMarkets: (parsed.pendingMarkets as PendingMarket[]) || [],
     };
   } catch {
     return null;
@@ -144,6 +157,24 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       active = false;
       unsubscribe();
     };
+  }, []);
+
+  // Subscribe to pending markets
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+    const db = getFirestoreDb();
+    const unsubscribe = onSnapshot(
+      collection(db, "pending_markets"),
+      (snap) => {
+        const next = snap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<PendingMarket, "id">),
+        })) as PendingMarket[];
+        setState((prev) => ({ ...prev, pendingMarkets: next }));
+      },
+      () => {}
+    );
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -480,6 +511,152 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const createMarket = async (data: CreateMarketData): Promise<{ success: boolean; error?: string }> => {
+    const dupKey = (round: string, name: string) =>
+      `${round.trim().toLowerCase()}|${name.trim().toLowerCase()}`;
+    const key = dupKey(data.round, data.name);
+
+    if (isFirebaseConfigured()) {
+      const auth = getFirebaseAuth();
+      const user = auth.currentUser;
+      if (!user?.email) return { success: false, error: "Not signed in." };
+      const db = getFirestoreDb();
+      try {
+        const [marketsSnap, pendingSnap] = await Promise.all([
+          getDocs(collection(db, "markets")),
+          getDocs(collection(db, "pending_markets")),
+        ]);
+        const hasDup =
+          marketsSnap.docs.some((d) => {
+            const m = d.data() as Market;
+            return dupKey(m.round, m.name) === key;
+          }) ||
+          pendingSnap.docs.some((d) => {
+            const m = d.data() as PendingMarket;
+            return m.status !== "rejected" && dupKey(m.round, m.name) === key;
+          });
+        if (hasDup) return { success: false, error: "A market with this question already exists for this round." };
+        const ref = doc(collection(db, "pending_markets"));
+        await setDoc(ref, {
+          ...data,
+          submittedBy: user.email,
+          submittedByName: user.displayName || "GP Racer",
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
+        return { success: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        console.error("[createMarket]", msg);
+        if (msg.includes("permission") || msg.includes("PERMISSION_DENIED")) {
+          return { success: false, error: "Permission denied. Ask admin to update Firestore rules." };
+        }
+        return { success: false, error: `Failed to submit: ${msg}` };
+      }
+    }
+
+    // Local mode
+    let result: { success: boolean; error?: string } = { success: false, error: "Not signed in." };
+    setState((prev) => {
+      if (!prev.currentEmail) return prev;
+      const user = prev.users[prev.currentEmail];
+      if (!user) return prev;
+      const hasDup =
+        prev.markets.some((m) => dupKey(m.round, m.name) === key) ||
+        prev.pendingMarkets.some((m) => m.status !== "rejected" && dupKey(m.round, m.name) === key);
+      if (hasDup) {
+        result = { success: false, error: "A market with this question already exists for this round." };
+        return prev;
+      }
+      result = { success: true };
+      return {
+        ...prev,
+        pendingMarkets: [
+          ...prev.pendingMarkets,
+          {
+            id: `pending-${Date.now()}`,
+            ...data,
+            submittedBy: user.email,
+            submittedByName: user.name,
+            status: "pending" as const,
+          },
+        ],
+      };
+    });
+    return result;
+  };
+
+  const approveMarket = async (pendingId: string): Promise<boolean> => {
+    if (isFirebaseConfigured()) {
+      const db = getFirestoreDb();
+      try {
+        const pendingSnap = await getDocs(collection(db, "pending_markets"));
+        const pendingDoc = pendingSnap.docs.find((d) => d.id === pendingId);
+        if (!pendingDoc) return false;
+        const pending = pendingDoc.data() as PendingMarket;
+        const newMarket: Market = {
+          id: `custom-${pendingId}`,
+          round: pending.round,
+          name: pending.name,
+          description: pending.description,
+          category: pending.category,
+          yesShares: 60,
+          noShares: 60,
+          volume: 0,
+        };
+        await setDoc(doc(db, "markets", newMarket.id), newMarket);
+        await setDoc(doc(db, "pending_markets", pendingId), { status: "approved" }, { merge: true });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    // Local mode
+    let found = false;
+    setState((prev) => {
+      const pending = prev.pendingMarkets.find((m) => m.id === pendingId);
+      if (!pending) return prev;
+      found = true;
+      const newMarket: Market = {
+        id: `custom-${pendingId}`,
+        round: pending.round,
+        name: pending.name,
+        description: pending.description,
+        category: pending.category,
+        yesShares: 60,
+        noShares: 60,
+        volume: 0,
+      };
+      return {
+        ...prev,
+        markets: [...prev.markets, newMarket],
+        pendingMarkets: prev.pendingMarkets.map((m) =>
+          m.id === pendingId ? { ...m, status: "approved" as const } : m
+        ),
+      };
+    });
+    return found;
+  };
+
+  const rejectMarket = async (pendingId: string): Promise<boolean> => {
+    if (isFirebaseConfigured()) {
+      const db = getFirestoreDb();
+      try {
+        await setDoc(doc(db, "pending_markets", pendingId), { status: "rejected" }, { merge: true });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    setState((prev) => ({
+      ...prev,
+      pendingMarkets: prev.pendingMarkets.map((m) =>
+        m.id === pendingId ? { ...m, status: "rejected" as const } : m
+      ),
+    }));
+    return true;
+  };
+
   const sellShares = async (marketId: string, side: "yes" | "no", shares: number) => {
     if (!Number.isFinite(shares) || shares <= 0) return false;
 
@@ -622,7 +799,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => {
     const user = state.currentEmail ? state.users[state.currentEmail] || null : null;
-    return { state: { ...state, user }, signIn, signOut, buyShares, sellShares, purchaseCoins, getMarketPrice };
+    return { state: { ...state, user }, signIn, signOut, buyShares, sellShares, purchaseCoins, getMarketPrice, createMarket, approveMarket, rejectMarket };
   }, [state]);
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;

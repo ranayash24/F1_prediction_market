@@ -3,6 +3,7 @@ import { Bebas_Neue, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import Providers from "@/app/providers";
 import TopNav from "@/components/TopNav";
+import AIChatbot from "@/components/AIChatbot";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
@@ -39,6 +40,7 @@ export default function RootLayout({
           <div className="page">
             <TopNav />
             {children}
+            <AIChatbot />
           </div>
         </Providers>
       </body>

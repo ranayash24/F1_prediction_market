@@ -3,6 +3,20 @@ import { calendar2026 } from "@/lib/calendar-2026";
 
 export const INITIAL_COINS = 1000;
 
+export const ADMIN_EMAIL =
+  process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "yashrana240203@gmail.com";
+
+export const MARKET_CATEGORIES = [
+  "Quali Winner",
+  "Race Winner",
+  "Safety Car",
+  "Fastest Lap",
+  "Driver of the Day",
+  "DNF / Retirement",
+  "Pit Stop Strategy",
+  "Other",
+] as const;
+
 export const leaderboardBots = [
   { name: "MonacoJet", balance: 16420 },
   { name: "PitWallPro", balance: 14980 },
