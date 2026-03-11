@@ -1,5 +1,7 @@
 # Redline Markets
 
+**Live site: [https://redlinem.netlify.app/](https://redlinem.netlify.app/)**
+
 F1-inspired prediction market demo with a multi-page Next.js UI, GP Coins economy, and Polymarket-style trading cards. The frontend can run standalone, or be paired with the optional Spring Boot backend for markets, trades, and chat.
 
 ## Features
