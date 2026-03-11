@@ -134,9 +134,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
                   name: data.name || "",
                   description: data.description || "",
                   category: data.category || "",
-                  yesShares: Number.isFinite(data.yesShares) ? data.yesShares : 0,
-                  noShares: Number.isFinite(data.noShares) ? data.noShares : 0,
-                  volume: Number.isFinite(data.volume) ? data.volume : 0,
+                  yesShares: Number.isFinite(data.yesShares) ? (data.yesShares as number) : 0,
+                  noShares: Number.isFinite(data.noShares) ? (data.noShares as number) : 0,
+                  volume: Number.isFinite(data.volume) ? (data.volume as number) : 0,
                 };
               })
               .filter((market) => market.round && market.name);
@@ -212,7 +212,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
               const targetId = idRemap.get(marketId) ?? marketId;
               const existing = nextPositions[targetId];
               nextPositions[targetId] = existing
-                ? { yes: existing.yes + position.yes, no: existing.no + position.no }
+                ? { yes: existing.yes + position.yes, no: existing.no + position.no, yesCost: (existing.yesCost ?? 0) + (position.yesCost ?? 0), noCost: (existing.noCost ?? 0) + (position.noCost ?? 0) }
                 : { ...position };
             });
             remappedUsers[email] = { ...user, positions: nextPositions };
@@ -288,7 +288,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         if (!snap.exists()) {
           const payload: User = {
             name: user.displayName || "GP Racer",
-            email: user.email,
+            email: user.email ?? "",
             provider: user.providerData[0]?.providerId || "firebase",
             balance: INITIAL_COINS,
             positions: {},
@@ -306,9 +306,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         const data = snap.data() as Partial<User>;
         const hydrated: User = {
           name: data.name || user.displayName || "GP Racer",
-          email: data.email || user.email,
+          email: data.email || user.email || "",
           provider: data.provider || user.providerData[0]?.providerId || "firebase",
-          balance: Number.isFinite(data.balance) ? data.balance : INITIAL_COINS,
+          balance: Number.isFinite(data.balance) ? (data.balance as number) : INITIAL_COINS,
           positions: data.positions || {},
         };
         setState((prev) => ({
@@ -362,9 +362,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
             name: market.name || "",
             description: market.description || "",
             category: market.category || "",
-            yesShares: Number.isFinite(market.yesShares) ? market.yesShares : 0,
-            noShares: Number.isFinite(market.noShares) ? market.noShares : 0,
-            volume: Number.isFinite(market.volume) ? market.volume : 0,
+            yesShares: Number.isFinite(market.yesShares) ? (market.yesShares as number) : 0,
+            noShares: Number.isFinite(market.noShares) ? (market.noShares as number) : 0,
+            volume: Number.isFinite(market.volume) ? (market.volume as number) : 0,
           };
           const prices = getMarketPrice(normalizedMarket);
           const price = side === "yes" ? prices.yes : prices.no;
@@ -686,9 +686,9 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
             name: market.name || "",
             description: market.description || "",
             category: market.category || "",
-            yesShares: Number.isFinite(market.yesShares) ? market.yesShares : 0,
-            noShares: Number.isFinite(market.noShares) ? market.noShares : 0,
-            volume: Number.isFinite(market.volume) ? market.volume : 0,
+            yesShares: Number.isFinite(market.yesShares) ? (market.yesShares as number) : 0,
+            noShares: Number.isFinite(market.noShares) ? (market.noShares as number) : 0,
+            volume: Number.isFinite(market.volume) ? (market.volume as number) : 0,
           };
           const prices = getMarketPrice(normalizedMarket);
           const price = side === "yes" ? prices.yes : prices.no;
