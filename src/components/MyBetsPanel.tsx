@@ -5,6 +5,7 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useMarket } from "@/lib/market-context";
 import { getFirebaseAuth, getFirestoreDb, isFirebaseConfigured } from "@/lib/firebase";
 import { formatCoins } from "@/lib/utils";
+import type { Market, Position } from "@/lib/types";
 
 type TradeRecord = {
   id: string;
@@ -100,7 +101,8 @@ export default function MyBetsPanel() {
 
   let totalValue = 0;
   let totalSpent = 0;
-  const enriched = entries.map(([marketId, position]) => {
+  type EnrichedEntry = { marketId: string; position: Position; market: Market; price: { yes: number; no: number }; yesValue: number; noValue: number; totalPositionValue: number; yesCost: number; noCost: number; totalCost: number; pnl: number };
+  const enriched = (entries.map(([marketId, position]) => {
     const market = state.markets.find((m) => m.id === marketId);
     if (!market) return null;
     const price = getMarketPrice(market);
@@ -114,7 +116,7 @@ export default function MyBetsPanel() {
     totalValue += totalPositionValue;
     totalSpent += totalCost;
     return { marketId, position, market, price, yesValue, noValue, totalPositionValue, yesCost, noCost, totalCost, pnl };
-  }).filter(Boolean) as NonNullable<(typeof enriched)[number]>[];
+  }).filter(Boolean)) as EnrichedEntry[];
 
   const handleSell = async (marketId: string) => {
     const input = sellInputs[marketId];
